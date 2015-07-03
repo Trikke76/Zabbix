@@ -1,6 +1,6 @@
 #!/bin/bash
 ### Make sure yum-plugin-security package is installed ###
-#ke sure zabbix-sender package is installed ###
+### Make sure zabbix-sender package is installed ###
 
 ZBX_DATA=/tmp/zabbix-sender-yum.in
 HOSTNAME=$(egrep ^Hostname= /etc/zabbix/zabbix_agentd.conf | cut -d = -f 2)
