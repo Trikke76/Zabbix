@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <zabbix_export>
     <version>2.0</version>
-    <date>2015-07-02T11:06:07Z</date>
+    <date>2015-07-03T12:05:00Z</date>
     <groups>
         <group>
             <name>Extra Templates</name>
@@ -23,6 +23,9 @@
                 </application>
                 <application>
                     <name>RedHat Version</name>
+                </application>
+                <application>
+                    <name>SELinux</name>
                 </application>
             </applications>
             <items>
@@ -75,7 +78,7 @@
                     <snmp_community/>
                     <multiplier>0</multiplier>
                     <snmp_oid/>
-                    <key>yum.imporant</key>
+                    <key>yum.important</key>
                     <delay>0</delay>
                     <history>90</history>
                     <trends>365</trends>
@@ -241,6 +244,49 @@
                     <valuemap/>
                     <logtimefmt/>
                 </item>
+                <item>
+                    <name>Status SELinux</name>
+                    <type>2</type>
+                    <snmp_community/>
+                    <multiplier>0</multiplier>
+                    <snmp_oid/>
+                    <key>yum.selinux</key>
+                    <delay>0</delay>
+                    <history>7</history>
+                    <trends>365</trends>
+                    <status>0</status>
+                    <value_type>3</value_type>
+                    <allowed_hosts/>
+                    <units/>
+                    <delta>0</delta>
+                    <snmpv3_contextname/>
+                    <snmpv3_securityname/>
+                    <snmpv3_securitylevel>0</snmpv3_securitylevel>
+                    <snmpv3_authprotocol>0</snmpv3_authprotocol>
+                    <snmpv3_authpassphrase/>
+                    <snmpv3_privprotocol>0</snmpv3_privprotocol>
+                    <snmpv3_privpassphrase/>
+                    <formula>1</formula>
+                    <delay_flex/>
+                    <params/>
+                    <ipmi_sensor/>
+                    <data_type>0</data_type>
+                    <authtype>0</authtype>
+                    <username/>
+                    <password/>
+                    <publickey/>
+                    <privatekey/>
+                    <port/>
+                    <description/>
+                    <inventory_link>0</inventory_link>
+                    <applications>
+                        <application>
+                            <name>SELinux</name>
+                        </application>
+                    </applications>
+                    <valuemap/>
+                    <logtimefmt/>
+                </item>
             </items>
             <discovery_rules/>
             <macros/>
@@ -249,6 +295,16 @@
         </template>
     </templates>
     <triggers>
+        <trigger>
+            <expression>{Template YUM Check Updates:yum.selinux.last()}&lt;&gt;1</expression>
+            <name>SELinux is NOT Active</name>
+            <url/>
+            <status>0</status>
+            <priority>4</priority>
+            <description/>
+            <type>0</type>
+            <dependencies/>
+        </trigger>
         <trigger>
             <expression>{Template YUM Check Updates:yum.critical.last()}&gt;0</expression>
             <name>{HOST.HOST} has Critical updates</name>
@@ -260,7 +316,7 @@
             <dependencies/>
         </trigger>
         <trigger>
-            <expression>{Template YUM Check Updates:yum.imporant.last()}&gt;0</expression>
+            <expression>{Template YUM Check Updates:yum.important.last()}&gt;0</expression>
             <name>{HOST.HOST} has Important updates</name>
             <url/>
             <status>0</status>
