@@ -1,0 +1,84 @@
+zabbix_export:
+  version: '7.0'
+  template_groups:
+    - uuid: 28d92aaac449423396f9d61f9abe099e
+      name: Templates/Applications
+  templates:
+    - uuid: 1bb68281c6f84945a3b42d9cbaa6613a
+      template: Netbackup
+      name: Netbackup
+      vendor:
+        name: Open-Future
+        version: 7.0-0
+      groups:
+      groups:
+        - name: Templates/Applications
+      items:
+        - uuid: da4b42f56b704143a04f07b39a460a53
+          name: 'Netbackup Discovery'
+          key: netbackup.discovery
+          delay: 15m
+          history: 1d
+          value_type: TEXT
+          preprocessing:
+            - type: CHECK_JSON_ERROR
+              parameters:
+                - $.error
+              error_handler: CUSTOM_ERROR
+              error_handler_params: 'Error in Connection'
+            - type: DISCARD_UNCHANGED_HEARTBEAT
+              parameters:
+                - 1h
+          tags:
+            - tag: component
+              value: raw
+      discovery_rules:
+        - uuid: 44b82c71c52642e9a776c4b0149d5163
+          name: 'Netbackup Discovery'
+          type: DEPENDENT
+          key: netbackup.discovery.lld
+          item_prototypes:
+            - uuid: b6d7b673f1444e71a2521245ab35ad65
+              name: '{#JOBID} -  {#POLICYNAME}'
+              type: DEPENDENT
+              key: 'lld.[{#JOBID}]'
+              trends: '0'
+              valuemap:
+                name: 'Error Codes Backup Netbackup'
+              preprocessing:
+                - type: JSONPATH
+                  parameters:
+                    - '$.data.[?(@.JOBID==''{#JOBID}'')].STATUS'
+              master_item:
+                key: netbackup.discovery
+              tags:
+                - tag: component
+                  value: backup
+              trigger_prototypes:
+                - uuid: 3aadc26337bd48b0a3c268a2228f386c
+                  expression: 'last(/Netbackup/lld.[{#JOBID}])>=2'
+                  name: 'Netbackup error in JobID - {#JOBID}'
+                  priority: AVERAGE
+          master_item:
+            key: netbackup.discovery
+          lld_macro_paths:
+            - lld_macro: '{#CLIENTNAME}'
+              path: $..CLIENTNAME.first()
+            - lld_macro: '{#ELAPSEDTIME}'
+              path: $..ELAPSEDTIME.first()
+            - lld_macro: '{#JOBID}'
+              path: $..JOBID.first()
+            - lld_macro: '{#JOBTYPE}'
+              path: $..JOBTYPE.first()
+            - lld_macro: '{#POLICYNAME}'
+              path: $..POLICYNAME.first()
+            - lld_macro: '{#STATUSCODE}'
+              path: $..STATUSCODE.first()
+      valuemaps:
+        - uuid: 452633a2ec554f87933cce99e422085e
+          name: 'Error Codes Backup Netbackup'
+          mappings:
+            - value: '2'
+              newvalue: 'None of the requested files were backed up'
+            - value: '11'
+              newvalue: 'System call failed'
