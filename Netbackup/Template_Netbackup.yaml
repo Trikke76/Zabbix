@@ -49,6 +49,9 @@ zabbix_export:
                 - type: JSONPATH
                   parameters:
                     - '$.data.[?(@.JOBID==''{#JOBID}'')].STATUS'
+                - type: JAVASCRIPT
+                  parameters:
+                    - 'return parseInt(value)'
               master_item:
                 key: netbackup.discovery
               tags:
