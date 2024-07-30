@@ -10,8 +10,8 @@ urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 # NetBackup API configuration
 BASE_URL = "https://<netbackup-url>:1556/netbackup"
-USERNAME = ""
-PASSWORD = ""
+USERNAME = "..."
+PASSWORD = "..."
 PAGELIMIT = "100"
 
 # Set the time range for job retrieval (last 7 days)
@@ -41,7 +41,7 @@ def get_failed_jobs(token):
         "Authorization": f"Bearer {token}"
     }
     payload = {
-        "page[limit]": PAGELIMIT,  # Adjust as needed
+        "page[limit]": PAGELIMIT,
         "filter": f"status gt 1 and endTime ge {start_time_iso} and endTime le {end_time_iso}"
     }
     while True:
@@ -82,16 +82,17 @@ try:
 
     for job in failed_jobs:
         job_data = {
-            "{#JOBID}": job['attributes'].get('jobId', 'N/A'),
-            "{#JOBTYPE}": job['attributes'].get('jobType', 'N/A'),
-            "{#STATUSCODE}": job['attributes'].get('status', 'N/A'),
-            "{#STATE}": job['attributes'].get('state', 'N/A'),
-            "{#POLICYNAME}": job['attributes'].get('policyName', 'N/A'),
-            "{#CLIENTNAME}": job['attributes'].get('clientName', 'N/A'),
-            "{#STARTTIME}": job['attributes'].get('startTime', 'N/A'),
-            "{#ENDTIME}": job['attributes'].get('endTime', 'N/A'),
-            "{#ELAPSEDTIME}": job['attributes'].get('elapsedTime', 'N/A'),
-            "{#KILOBYTESTRANSFERRED}": job['attributes'].get('kilobytesTransferred', 'N/A')
+            "JOBID": job['attributes'].get('jobId', 'N/A'),
+            "JOBTYPE": job['attributes'].get('jobType', 'N/A'),
+            "STATUSCODE": job['attributes'].get('status', 'N/A'),
+            "STATE": job['attributes'].get('state', 'N/A'),
+            "STATUS": job['attributes'].get('status', 'N/A'),
+            "POLICYNAME": job['attributes'].get('policyName', 'N/A'),
+            "CLIENTNAME": job['attributes'].get('clientName', 'N/A'),
+            "STARTTIME": job['attributes'].get('startTime', 'N/A'),
+            "ENDTIME": job['attributes'].get('endTime', 'N/A'),
+            "ELAPSEDTIME": job['attributes'].get('elapsedTime', 'N/A'),
+            "KILOBYTESTRANSFERRED": job['attributes'].get('kilobytesTransferred', 'N/A')
         }
 
 
