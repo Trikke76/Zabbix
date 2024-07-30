@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-
 import requests
 import json
 from datetime import datetime, timedelta
@@ -10,9 +9,10 @@ import sys
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 # NetBackup API configuration
-BASE_URL = "https://<Netbackup URL>:1556/netbackup"
+BASE_URL = "https://<netbackup-url>:1556/netbackup"
 USERNAME = ""
 PASSWORD = ""
+PAGELIMIT = "100"
 
 # Set the time range for job retrieval (last 7 days)
 end_time = datetime.utcnow()
@@ -41,7 +41,7 @@ def get_failed_jobs(token):
         "Authorization": f"Bearer {token}"
     }
     payload = {
-        "page[limit]": 100,  # Adjust as needed
+        "page[limit]": PAGELIMIT,  # Adjust as needed
         "filter": f"status gt 1 and endTime ge {start_time_iso} and endTime le {end_time_iso}"
     }
     while True:
@@ -79,7 +79,6 @@ try:
     discovery_data = {
         "data": []
     }
-
 
     for job in failed_jobs:
         job_data = {
