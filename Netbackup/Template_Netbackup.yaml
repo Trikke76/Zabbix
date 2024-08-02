@@ -9,8 +9,7 @@ zabbix_export:
       name: Netbackup
       vendor:
         name: Open-Future
-        version: 7.0-0
-      groups:
+        version: 7.0-1
       groups:
         - name: Templates/Applications
       items:
@@ -37,6 +36,7 @@ zabbix_export:
           name: 'Netbackup Discovery'
           type: DEPENDENT
           key: netbackup.discovery.lld
+          lifetime: 2d
           item_prototypes:
             - uuid: b6d7b673f1444e71a2521245ab35ad65
               name: '{#JOBID} -  {#POLICYNAME}'
@@ -49,9 +49,12 @@ zabbix_export:
                 - type: JSONPATH
                   parameters:
                     - '$.data.[?(@.JOBID==''{#JOBID}'')].STATUS'
+                - type: TRIM
+                  parameters:
+                    - '[]'
                 - type: JAVASCRIPT
                   parameters:
-                    - 'return parseInt(value)'
+                    - 'return parseInt(value);'
               master_item:
                 key: netbackup.discovery
               tags:
