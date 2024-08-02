@@ -1,0 +1,89 @@
+zabbix_export:
+  version: '7.0'
+  template_groups:
+    - uuid: a571c0d144b14fd4a87a9d9b2aa9fcd6
+      name: Templates/Applications
+  templates:
+    - uuid: a1316de672ae450f842db96015a54346
+      template: 'Netbackup HTTP'
+      name: 'Netbackup HTTP'
+      vendor:
+        name: Open-Future
+        version: 7.0-0
+      groups:
+        - name: Templates/Applications
+      items:
+        - uuid: 195590cee14e42989a82763a85ef1489
+          name: 'Netbackup - raw'
+          type: HTTP_AGENT
+          key: netbackup.raw
+          delay: 5m
+          history: 7d
+          value_type: TEXT
+          preprocessing:
+            - type: DISCARD_UNCHANGED_HEARTBEAT
+              parameters:
+                - 1h
+          url: 'https://netbackup-server01.intrrn.be:1556/netbackup/admin/jobs'
+          query_fields:
+            - name: filter
+              value: 'status gt 0'
+            - name: 'page[limit]'
+              value: '20'
+          headers:
+            - name: Content-Type
+              value: application/vnd.netbackup+json;version=3.0
+            - name: Authorization
+              value: 'Bearer {$BEARER.TOKEN}'
+          tags:
+            - tag: component
+              value: raw
+      discovery_rules:
+        - uuid: 8cb5243abd1449be836334f8ce2e7518
+          name: 'Discovery JOBS Netbackup'
+          type: DEPENDENT
+          key: discovery.netbackup
+          lifetime_type: DELETE_IMMEDIATELY
+          item_prototypes:
+            - uuid: b063a27a85f3493996e527d393022f6c
+              name: '{#JOBID} -  {#CLIENTNAME}'
+              type: DEPENDENT
+              key: 'lld.[{#JOBID}]'
+              trends: '0'
+              preprocessing:
+                - type: JSONPATH
+                  parameters:
+                    - '$.data[?(@.attributes.jobId == ''{#JOBID}'')].attributes.status'
+                - type: TRIM
+                  parameters:
+                    - '[]'
+              master_item:
+                key: netbackup.raw
+              tags:
+                - tag: application
+                  value: Netbackup
+              trigger_prototypes:
+                - uuid: 7532567bfa97404e948ff7e1e0062176
+                  expression: 'last(/Netbackup HTTP/lld.[{#JOBID}])>0'
+                  name: 'Netbackup error in JobID - {#JOBID}'
+                  priority: AVERAGE
+          master_item:
+            key: netbackup.raw
+          lld_macro_paths:
+            - lld_macro: '{#CLIENTNAME}'
+              path: $..attributes.clientName
+            - lld_macro: '{#JOBID}'
+              path: $..attributes.jobId.first()
+            - lld_macro: '{#STATE}'
+              path: $..attributes.state
+      macros:
+        - macro: '{$BEARER.TOKEN}'
+          type: SECRET_TEXT
+      valuemaps:
+        - uuid: c74017862dc44cee9cdac22023d2d7e4
+          name: 'Error Codes Backup Netbackup'
+          mappings:
+            - value: '2'
+              newvalue: 'None of the requested files were backed up'
+            - value: '11'
+              newvalue: 'System call failed'
