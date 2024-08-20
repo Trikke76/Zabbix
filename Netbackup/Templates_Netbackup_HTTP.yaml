@@ -9,7 +9,7 @@ zabbix_export:
       name: 'Netbackup HTTP'
       vendor:
         name: Open-Future
-        version: 7.0-0
+        version: 7.0-1
       groups:
         - name: Templates/Applications
       items:
@@ -38,18 +38,26 @@ zabbix_export:
           tags:
             - tag: component
               value: raw
+          triggers:
+            - uuid: f4665aee70ca467793319f95671d912c
+              expression: 'nodata(/Netbackup HTTP/netbackup.raw,2h)=1'
+              name: 'No data from API received'
+              priority: HIGH
+              manual_close: 'YES'
       discovery_rules:
         - uuid: 8cb5243abd1449be836334f8ce2e7518
           name: 'Discovery JOBS Netbackup'
           type: DEPENDENT
           key: discovery.netbackup
-          lifetime_type: DELETE_IMMEDIATELY
+          lifetime: 2d
           item_prototypes:
             - uuid: b063a27a85f3493996e527d393022f6c
               name: '{#JOBID} -  {#CLIENTNAME}'
               type: DEPENDENT
               key: 'lld.[{#JOBID}]'
               trends: '0'
+              valuemap:
+                name: 'Error Codes Backup Netbackup'
               preprocessing:
                 - type: JSONPATH
                   parameters:
@@ -87,3 +95,11 @@ zabbix_export:
               newvalue: 'None of the requested files were backed up'
             - value: '11'
               newvalue: 'System call failed'
+            - value: '20'
+              newvalue: 'Invalid command parameter'
+            - value: '84'
+              newvalue: 'Media write error'
+            - value: '96'
+              newvalue: 'Unable to allocate new media for backup, storage unit has none a'
+            - value: '4287'
+              newvalue: 'A NetBackup snapshot of the virtual machine exists and the polic'
