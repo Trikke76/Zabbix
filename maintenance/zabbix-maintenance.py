@@ -1,13 +1,15 @@
+#!/usr/bin/python
 import requests
 import json
 import sys
 from datetime import datetime, timedelta
 
 # Zabbix API configuration
-ZABBIX_API_URL = "https://zabbix-url/api_jsonrpc.php"
+ZABBIX_API_URL = "https://monitoring.intrrn.be/api_jsonrpc.php"
 ZABBIX_USER = "your_username"
 ZABBIX_PASSWORD = "your_password"
 
+# Zabbix API Script to create and delete maintenance periods
 def zabbix_auth():
     auth_data = {
         "jsonrpc": "2.0",
@@ -65,7 +67,7 @@ def get_host_id(auth_token, hostname):
     else:
         raise Exception(f"Host '{hostname}' not found")
 
-def create_maintenance(auth_token, host_id, duration_minutes):
+def create_maintenance(auth_token, host_id, duration_minutes, collect_data=True):
     start_time = int(datetime.now().timestamp())
     end_time = int((datetime.now() + timedelta(minutes=duration_minutes)).timestamp())
     
@@ -83,7 +85,8 @@ def create_maintenance(auth_token, host_id, duration_minutes):
                     "start_date": start_time,
                     "period": duration_minutes * 60
                 }
-            ]
+            ],
+            "maintenance_type": 0 if collect_data else 1
         },
         "auth": auth_token,
         "id": 3
@@ -95,7 +98,6 @@ def create_maintenance(auth_token, host_id, duration_minutes):
     return response.json()['result']
 
 def delete_maintenance(auth_token, hostname):
-    # First, get all maintenances
     get_maintenance_data = {
         "jsonrpc": "2.0",
         "method": "maintenance.get",
@@ -112,7 +114,6 @@ def delete_maintenance(auth_token, hostname):
     response = requests.post(ZABBIX_API_URL, json=get_maintenance_data, headers=headers)
     maintenances = response.json()['result']
     
-    # Find maintenances for the specified host
     host_id = get_host_id(auth_token, hostname)
     maintenance_ids = [m['maintenanceid'] for m in maintenances if any(h['hostid'] == host_id for h in m['hosts'])]
     
@@ -120,7 +121,6 @@ def delete_maintenance(auth_token, hostname):
         print(f"No active maintenances found for host '{hostname}'")
         return
     
-    # Delete found maintenances
     delete_maintenance_data = {
         "jsonrpc": "2.0",
         "method": "maintenance.delete",
@@ -132,7 +132,7 @@ def delete_maintenance(auth_token, hostname):
     result = response.json()['result']
     print(f"Deleted {len(result['maintenanceids'])} maintenance(s) for host '{hostname}'")
 
-def main(action, hostname, duration_minutes=None):
+def main(action, hostname, duration_minutes=None, collect_data=True):
     auth_token = zabbix_auth()
     if auth_token is None:
         print("Authentication failed. Please check your Zabbix API configuration.")
@@ -143,8 +143,9 @@ def main(action, hostname, duration_minutes=None):
             if duration_minutes is None:
                 raise ValueError("Duration is required for create action")
             host_id = get_host_id(auth_token, hostname)
-            result = create_maintenance(auth_token, host_id, duration_minutes)
+            result = create_maintenance(auth_token, host_id, duration_minutes, collect_data)
             print(f"Maintenance created successfully. Maintenance ID: {result['maintenanceids'][0]}")
+            print(f"Data collection during maintenance: {'Enabled' if collect_data else 'Disabled'}")
         elif action.lower() == "delete":
             delete_maintenance(auth_token, hostname)
         else:
@@ -153,12 +154,14 @@ def main(action, hostname, duration_minutes=None):
         print(f"Error: {str(e)}")
 
 if __name__ == "__main__":
-    if len(sys.argv) < 3 or len(sys.argv) > 4:
+    if len(sys.argv) < 3 or len(sys.argv) > 5:
         print("Usage:")
-        print("  For create: python script.py create <hostname> <duration_minutes>")
+        print("  For create: python script.py create <hostname> <duration_minutes> [collect_data]")
         print("  For delete: python script.py delete <hostname>")
+        print("  collect_data: 'yes' (default) or 'no'")
     else:
         action = sys.argv[1]
         hostname = sys.argv[2]
-        duration_minutes = int(sys.argv[3]) if len(sys.argv) == 4 else None
-        main(action, hostname, duration_minutes)
+        duration_minutes = int(sys.argv[3]) if len(sys.argv) > 3 else None
+        collect_data = True if len(sys.argv) <= 4 or sys.argv[4].lower() == 'yes' else False
+        main(action, hostname, duration_minutes, collect_data)
