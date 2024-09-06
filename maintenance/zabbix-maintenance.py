@@ -1,166 +1,164 @@
-#!/usr/bin/python
-import json, sys, requests, time
+import requests
+import json
+import sys
+from datetime import datetime, timedelta
 
-# Fix for proxy env var
-proxies = {'http': None,'https': None}
-# Global variables for requests
-headers = {'Content-Type': 'application/json-rpc'}
-zabbix_host = 'zabbix.local'
-base_url = 'https://zabbix-url/api_jsonrpc.php'
+# Zabbix API configuration
+ZABBIX_API_URL = "https://zabbix-url/api_jsonrpc.php"
+ZABBIX_USER = "your_username"
+ZABBIX_PASSWORD = "your_password"
 
-# Get user
-username = 'zabbix_api'
-# Password
-password = 'password'
-# Action
-action = str(sys.argv[1])
-# Hostname
-hostname = str(sys.argv[2])
-# time
-period = str(sys.argv[3])
-
-# Base function for request to Zabbix
-# login - login to Zabbix
-# logout - logout from Zabbix
-# maintenance_list - list of all maintenances
-# host_list - list of all hosts
-# create - create maintenance period
-# remove - remove maintenance period
-def request(type, auth, name = None, uid = None, username = username, password = password):
-    global proxies, headers, base_url
-    # Set base JSON for request
-    if type == 'login':
-        data = json.loads('{"jsonrpc": "2.0", "method": "user.login", "params": { "username": "NULL", "password": "NULL" }, "id": 1, "auth": null }')
-        data['params']['username'] = username
-        data['params']['password'] = password
-    if type == 'logout':
-        data = json.loads('{"jsonrpc": "2.0", "method": "user.logout", "params": [], "id": 1, "auth": "NULL"}')
-    if type == 'maintenance_list':
-        data = json.loads('{"jsonrpc": "2.0", "method": "maintenance.get", "params": { "output": "extend", "selectGroups": "extend", "selectHosts": "extend", "selectTimeperiods": "extend"}, "auth": "NULL", "id": 1}')
-    if type == 'host_list':
-        data = json.loads('{ "jsonrpc": "2.0", "method": "host.get", "params": { }, "auth": "NULL", "id": 1 }')
-    if type == 'create':
-        data = json.loads('{"jsonrpc":"2.0","method":"maintenance.create","params":{"name":"NULL","active_since":0,"active_till":0,"hosts":[],"timeperiods":[{"timeperiod_type":0, "period":' + period + ' }]},"auth":"NULL","id":1}')
-        data['params']['active_since'] = str(int(time.time()) - 3600)
-        data['params']['active_till'] = str(int(time.time()) + int(period))
-        hostids = { 'hostid': uid }
-        data['params']['hosts'].append(hostids)
-        data['params']['name'] = 'automatic_' + name
-    if type == 'remove':
-        data = json.loads('{"jsonrpc":"2.0","method":"maintenance.delete","params":[],"auth":"NULL","id":1}')
-        data['params'].append(uid)
-    # Set auth token for non-login request
-    if type != 'login':
-        data['auth'] = auth
-    # Dumps JSON to text
-    data = json.dumps(data)
+def zabbix_auth():
+    auth_data = {
+        "jsonrpc": "2.0",
+        "method": "user.login",
+        "params": {
+            "username": ZABBIX_USER,
+            "password": ZABBIX_PASSWORD
+        },
+        "id": 1
+    }
+    headers = {
+        "Content-Type": "application/json-rpc"
+    }
     try:
-        data = requests.post(base_url, data = data, proxies=proxies, headers = headers).text
-        data = json.loads(data)
-        return data
-    except:
-        print ('Error to get response from Zabbix for ' + type )
-
-
-# Login to Zabbix
-def login(username, password):
-    data = request('login', None, None, None, username, password)
-    try:
-        auth = data['result']
-        print ('Login to ' + zabbix_host + ': ok')
-        return auth
-    except:
-        print ("Problem with login")
-        sys.exit(1)
-
-# Logout from Zabbix
-def logout(auth):
-    data = request('logout', auth)
-    try:
-        if data['result'] == True:
-            print ('Logout from ' + zabbix_host + ': ok')
+        response = requests.post(ZABBIX_API_URL, json=auth_data, headers=headers)
+        response.raise_for_status()
+        json_response = response.json()
+        if 'result' in json_response:
+            return json_response['result']
+        elif 'error' in json_response:
+            print(f"Authentication error: {json_response['error'].get('data', json_response['error'].get('message', 'Unknown error'))}")
+            return None
         else:
-            print ('Problem with logout')
-    except:
-        print ('Problem with logout')
-        sys.exit(1)
+            print(f"Unexpected response structure: {json_response}")
+            return None
+    except requests.exceptions.RequestException as e:
+        print(f"Request failed: {e}")
+        if hasattr(e, 'response'):
+            print(f"Response content: {e.response.text}")
+        return None
+    except json.JSONDecodeError as e:
+        print(f"Failed to parse JSON: {e}")
+        print(f"Raw response: {response.text}")
+        return None
 
-# Get list of all maintenance
-def maintenance_list(auth):
-    data = request('maintenance_list', auth)
+def get_host_id(auth_token, hostname):
+    host_data = {
+        "jsonrpc": "2.0",
+        "method": "host.get",
+        "params": {
+            "filter": {
+                "host": [hostname]
+            }
+        },
+        "auth": auth_token,
+        "id": 2
+    }
+    headers = {
+        "Content-Type": "application/json-rpc"
+    }
+    response = requests.post(ZABBIX_API_URL, json=host_data, headers=headers)
+    result = response.json()['result']
+    if result:
+        return result[0]['hostid']
+    else:
+        raise Exception(f"Host '{hostname}' not found")
+
+def create_maintenance(auth_token, host_id, duration_minutes):
+    start_time = int(datetime.now().timestamp())
+    end_time = int((datetime.now() + timedelta(minutes=duration_minutes)).timestamp())
+    
+    maintenance_data = {
+        "jsonrpc": "2.0",
+        "method": "maintenance.create",
+        "params": {
+            "name": f"Maintenance for host ID {host_id}",
+            "active_since": start_time,
+            "active_till": end_time,
+            "hostids": [host_id],
+            "timeperiods": [
+                {
+                    "timeperiod_type": 0,
+                    "start_date": start_time,
+                    "period": duration_minutes * 60
+                }
+            ]
+        },
+        "auth": auth_token,
+        "id": 3
+    }
+    headers = {
+        "Content-Type": "application/json-rpc"
+    }
+    response = requests.post(ZABBIX_API_URL, json=maintenance_data, headers=headers)
+    return response.json()['result']
+
+def delete_maintenance(auth_token, hostname):
+    # First, get all maintenances
+    get_maintenance_data = {
+        "jsonrpc": "2.0",
+        "method": "maintenance.get",
+        "params": {
+            "output": "extend",
+            "selectHosts": "extend"
+        },
+        "auth": auth_token,
+        "id": 4
+    }
+    headers = {
+        "Content-Type": "application/json-rpc"
+    }
+    response = requests.post(ZABBIX_API_URL, json=get_maintenance_data, headers=headers)
+    maintenances = response.json()['result']
+    
+    # Find maintenances for the specified host
+    host_id = get_host_id(auth_token, hostname)
+    maintenance_ids = [m['maintenanceid'] for m in maintenances if any(h['hostid'] == host_id for h in m['hosts'])]
+    
+    if not maintenance_ids:
+        print(f"No active maintenances found for host '{hostname}'")
+        return
+    
+    # Delete found maintenances
+    delete_maintenance_data = {
+        "jsonrpc": "2.0",
+        "method": "maintenance.delete",
+        "params": maintenance_ids,
+        "auth": auth_token,
+        "id": 5
+    }
+    response = requests.post(ZABBIX_API_URL, json=delete_maintenance_data, headers=headers)
+    result = response.json()['result']
+    print(f"Deleted {len(result['maintenanceids'])} maintenance(s) for host '{hostname}'")
+
+def main(action, hostname, duration_minutes=None):
+    auth_token = zabbix_auth()
+    if auth_token is None:
+        print("Authentication failed. Please check your Zabbix API configuration.")
+        return
+
     try:
-        print (data)
-    except:
-        print ('Problem with get list of maintenances')
-        sys.exit(1)
+        if action.lower() == "create":
+            if duration_minutes is None:
+                raise ValueError("Duration is required for create action")
+            host_id = get_host_id(auth_token, hostname)
+            result = create_maintenance(auth_token, host_id, duration_minutes)
+            print(f"Maintenance created successfully. Maintenance ID: {result['maintenanceids'][0]}")
+        elif action.lower() == "delete":
+            delete_maintenance(auth_token, hostname)
+        else:
+            print("Invalid action. Use 'create' or 'delete'.")
+    except Exception as e:
+        print(f"Error: {str(e)}")
 
-# Get maintenance ID for Zabbix host
-def maintenance_getid(auth, host):
-    data = request('maintenance_list', auth)
-    for maintenance in data['result']:
-        if 'automatic' in maintenance['name']:
-            for each in maintenance['hosts']:
-                if host == each['host']:
-                    return str(maintenance['maintenanceid'])
-    return None
-
-# Get host IDs for host with hostname like string
-def host_get_ids(auth, host):
-    data = request('host_list', auth)
-    hosts = []
-    names = set()
-    for each in data['result']:
-        if host in each['host']:
-            info = { 'name': each['host'], 'hostid': each['hostid'] }
-            hosts.append(info)
-    print ('Get host IDs for ' + host + ':')
-    for each in hosts: print (str(each['name']) + ' - ' + str(each['hostid']))
-    return hosts
-
-# Create maintenance period for host with Zabbix hostname like string
-def maintenance_create(auth, host):
-    hosts = host_get_ids(auth, host)
-    print ('-----')
-    if len(hosts) > 0:
-        for each in hosts:
-            x = request('create', auth, each['name'], each['hostid'])
-            print(x)
-            try:
-                print ('Maintenance for ' + str(each['name']) + ' created: ' + str(x['result']['maintenanceids'][0]))
-                continue
-            except:
-                print ('Maintenance for ' + str(each['name']) + ' NOT created!!!')
-                continue
+if __name__ == "__main__":
+    if len(sys.argv) < 3 or len(sys.argv) > 4:
+        print("Usage:")
+        print("  For create: python script.py create <hostname> <duration_minutes>")
+        print("  For delete: python script.py delete <hostname>")
     else:
-        print ('No host found')
-
-# Delete maintenance period for host with Zabbix hostname like string
-def maintenance_remove(auth, host):
-    hosts = host_get_ids(auth, host)
-    print ('-----')
-    if len(hosts) > 0:
-        for each in hosts:
-            maintenanceid = maintenance_getid(auth, each['name'])
-            if maintenanceid != None:
-                x = request('remove', auth, each['name'], maintenanceid)
-                try:
-                    if x['result']['maintenanceids'][0] == maintenanceid:
-                        print ('Maintenance for ' + each['name'] + ' removed')
-                    else:
-                        print ('Maintenance for ' + each['name'] + ' NOT removed!!!')
-                except:
-                    print ('Maintenance for ' + each['name'] + ' NOT removed!!!')
-            else:
-                print (each['name'] + ' not in maintenance')
-    else:
-        print ('No host found')
-
-# Work
-auth = login(username,password)
-print ('-----')
-if action == 'create':
-    maintenance_create(auth, hostname)
-if action == 'remove':
-    maintenance_remove(auth, hostname)
-print ('-----')
-logout(auth)
+        action = sys.argv[1]
+        hostname = sys.argv[2]
+        duration_minutes = int(sys.argv[3]) if len(sys.argv) == 4 else None
+        main(action, hostname, duration_minutes)
