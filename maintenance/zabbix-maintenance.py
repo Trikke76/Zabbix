@@ -5,7 +5,7 @@ import sys
 from datetime import datetime, timedelta
 
 # Zabbix API configuration
-ZABBIX_API_URL = "https://monitoring.intrrn.be/api_jsonrpc.php"
+ZABBIX_API_URL = "https://zabbix-url.be/api_jsonrpc.php"
 ZABBIX_USER = "your_username"
 ZABBIX_PASSWORD = "your_password"
 
