@@ -1,0 +1,404 @@
+zabbix_export:
+  version: '7.0'
+  template_groups:
+    - uuid: a571c0d144b14fd4a87a9d9b2aa9fcd6
+      name: Templates/Applications
+  templates:
+    - uuid: a1316de672ae450f842db96015a54346
+      template: 'Netbackup HTTP'
+      name: 'Netbackup HTTP'
+      vendor:
+        name: Open-Future
+        version: 7.0-2
+      groups:
+        - name: Templates/Applications
+      items:
+        - uuid: 195590cee14e42989a82763a85ef1489
+          name: 'Netbackup - raw'
+          type: HTTP_AGENT
+          key: netbackup.raw
+          delay: 5m
+          history: 7d
+          value_type: TEXT
+          trends: '0'
+          preprocessing:
+            - type: DISCARD_UNCHANGED_HEARTBEAT
+              parameters:
+                - 1h
+          url: 'https://netbackup-server:1556/netbackup/admin/jobs'
+          query_fields:
+            - name: filter
+              value: 'status gt 0'
+            - name: 'page[limit]'
+              value: '20'
+          headers:
+            - name: Content-Type
+              value: application/vnd.netbackup+json;version=3.0
+            - name: Authorization
+              value: 'Bearer {$BEARER.TOKEN}'
+          tags:
+            - tag: component
+              value: raw
+          triggers:
+            - uuid: f4665aee70ca467793319f95671d912c
+              expression: 'nodata(/Netbackup HTTP/netbackup.raw,2h)=1'
+              name: 'No data from Backup API received'
+              priority: HIGH
+              manual_close: 'YES'
+        - uuid: 3ce6ed43d3a44a918395622810b43129
+          name: 'Netbackup Scratch Tapes - raw'
+          type: HTTP_AGENT
+          key: netbackup.scratchtapes.raw
+          delay: 5m
+          history: 7d
+          value_type: TEXT
+          trends: '0'
+          preprocessing:
+            - type: DISCARD_UNCHANGED_HEARTBEAT
+              parameters:
+                - 6h
+          url: 'https://netbackup-server:1556/netbackup/storage/tape-media?'
+          query_fields:
+            - name: 'page[limit]'
+              value: '10'
+            - name: 'page[offset]'
+              value: '0'
+            - name: filter
+              value: 'startswith(volumePool,''Scratch_Tapes'')'
+          headers:
+            - name: Content-Type
+              value: application/vnd.netbackup+json;version=3.0
+            - name: Authorization
+              value: 'Bearer {$BEARER.TOKEN}'
+          tags:
+            - tag: component
+              value: raw
+        - uuid: 2aa6e3f143084628950c17017a5b4b54
+          name: 'Netbackup storage - raw'
+          type: HTTP_AGENT
+          key: netbackup.storage.raw
+          delay: 5m
+          history: 7d
+          value_type: TEXT
+          trends: '0'
+          preprocessing:
+            - type: DISCARD_UNCHANGED_HEARTBEAT
+              parameters:
+                - 1h
+          url: 'https://netbackup-server:1556/netbackup/storage/storage-units'
+          query_fields:
+            - name: 'page[limit]'
+              value: '10'
+            - name: 'page[offset]'
+              value: '0'
+          headers:
+            - name: Content-Type
+              value: application/vnd.netbackup+json;version=3.0
+            - name: Authorization
+              value: 'Bearer {$BEARER.TOKEN}'
+          tags:
+            - tag: component
+              value: raw
+          triggers:
+            - uuid: c43b48b816f1437c9d8f95313e196c74
+              expression: 'nodata(/Netbackup HTTP/netbackup.storage.raw,2h)=1'
+              name: 'No data from storage API received'
+              priority: HIGH
+              manual_close: 'YES'
+        - uuid: c01b681d57e54eb0b181f9eeeb62d13c
+          name: 'Netbackup Tapes - Media - raw'
+          type: HTTP_AGENT
+          key: netbackup.tapes.media.raw
+          delay: 1h
+          history: 7d
+          value_type: TEXT
+          trends: '0'
+          url: 'https://netbackup-server/netbackup/storage/tape-media'
+          query_fields:
+            - name: 'page[limit]'
+              value: '100'
+            - name: 'page[offset]'
+              value: '0'
+          headers:
+            - name: Content-Type
+              value: application/vnd.netbackup+json;version=3.0
+            - name: Authorization
+              value: 'Bearer {$BEARER.TOKEN}'
+          tags:
+            - tag: component
+              value: netbackup
+        - uuid: e744e0b0440e4f519c47203f537a2b7b
+          name: 'Netbackup Tapes - VolumePools - raw'
+          type: HTTP_AGENT
+          key: netbackup.tapes.volumepools.raw
+          delay: 10m
+          history: '0'
+          value_type: TEXT
+          trends: '0'
+          url: 'https://netbackup-server/netbackup/storage/tape-volume-pools'
+          query_fields:
+            - name: 'page[limit]'
+              value: '20'
+            - name: 'page[offset]'
+              value: '0'
+          headers:
+            - name: Content-Type
+              value: application/vnd.netbackup+json;version=3.0
+            - name: Authorization
+              value: 'Bearer {$BEARER.TOKEN}'
+          tags:
+            - tag: component
+              value: netbackup
+        - uuid: f48b52bbbac447a3b470f2df8f0244eb
+          name: 'Netbackup Version'
+          type: DEPENDENT
+          key: netbackup.version
+          delay: '0'
+          value_type: TEXT
+          trends: '0'
+          preprocessing:
+            - type: JSONPATH
+              parameters:
+                - '$..attributes.mediaServerDetails.[*].netbackupVersion.first()'
+            - type: TRIM
+              parameters:
+                - '[]'
+          master_item:
+            key: netbackup.storage.raw
+      discovery_rules:
+        - uuid: 8cb5243abd1449be836334f8ce2e7518
+          name: 'Discovery JOBS Netbackup'
+          type: DEPENDENT
+          key: discovery.netbackup
+          delay: '0'
+          lifetime: 2d
+          item_prototypes:
+            - uuid: b063a27a85f3493996e527d393022f6c
+              name: '{#JOBID} -  {#CLIENTNAME}'
+              type: DEPENDENT
+              key: 'lld.[{#JOBID}]'
+              delay: '0'
+              trends: '0'
+              valuemap:
+                name: 'Error Codes Backup Netbackup'
+              preprocessing:
+                - type: JSONPATH
+                  parameters:
+                    - '$.data[?(@.attributes.jobId == ''{#JOBID}'')].attributes.status'
+                - type: TRIM
+                  parameters:
+                    - '[]'
+              master_item:
+                key: netbackup.raw
+              tags:
+                - tag: application
+                  value: netbackup
+                - tag: jobid
+                  value: '{#JOBID}'
+              trigger_prototypes:
+                - uuid: 7532567bfa97404e948ff7e1e0062176
+                  expression: 'last(/Netbackup HTTP/lld.[{#JOBID}])>0 and last(/Netbackup HTTP/lld.[{#JOBID}])<>11 and last(/Netbackup HTTP/lld.[{#JOBID}])<>20 and last(/Netbackup HTTP/lld.[{#JOBID}])<>150'
+                  name: 'Netbackup error in JobID - {#JOBID}'
+                  priority: AVERAGE
+                  description: |
+                    Errors with some backup catalog :
+                        11 = system call failed
+                        20 = invalid command parameter
+                    
+                    Not errors :
+                        150 = termination requested by administrator
+                    
+                    https://www.veritas.com/support/en_US/doc/44037985-127664609-0/v15099029-127664609
+                  manual_close: 'YES'
+          master_item:
+            key: netbackup.raw
+          lld_macro_paths:
+            - lld_macro: '{#CLIENTNAME}'
+              path: $..attributes.clientName
+            - lld_macro: '{#JOBID}'
+              path: $..attributes.jobId.first()
+            - lld_macro: '{#STATE}'
+              path: $..attributes.state
+        - uuid: 49330106e6fb4d718dd1490546ca7b76
+          name: 'Discovery Storage Netbackup'
+          type: DEPENDENT
+          key: discovery.storage
+          delay: '0'
+          filter:
+            conditions:
+              - macro: '{#STORAGE}'
+                value: '{$STORAGE.NOT_MATCHES}'
+                operator: NOT_MATCHES_REGEX
+                formulaid: A
+          item_prototypes:
+            - uuid: 243c4c9a6ca6496b8bc3382d68a605f6
+              name: 'Free Storage - {#STORAGE} in %'
+              type: CALCULATED
+              key: 'calculated.free.[{#STORAGE}]'
+              delay: 5m
+              units: '%'
+              params: '100*last(//free.[{#STORAGE}])/last(//total.[{#STORAGE}])'
+              tags:
+                - tag: application
+                  value: netbackup-storage
+                - tag: storage
+                  value: '{#STORAGE}'
+              trigger_prototypes:
+                - uuid: 68894cf922d2469ca77d009466b5c5dc
+                  expression: 'min(/Netbackup HTTP/calculated.free.[{#STORAGE}],15)<={$STORAGE.HIGH}'
+                  name: 'Free space on datastore {#STORAGE} <= {$STORAGE.HIGH} %'
+                  priority: HIGH
+                - uuid: 67bd8688ae0a4c1d9b1f27a67aa1abd3
+                  expression: 'min(/Netbackup HTTP/calculated.free.[{#STORAGE}],15)<={$STORAGE.WARNING}'
+                  name: 'Free space on datastore {#STORAGE} <= {$STORAGE.WARNING} %'
+                  priority: AVERAGE
+                  manual_close: 'YES'
+                  dependencies:
+                    - name: 'Free space on datastore {#STORAGE} <= {$STORAGE.HIGH} %'
+                      expression: 'min(/Netbackup HTTP/calculated.free.[{#STORAGE}],15)<={$STORAGE.HIGH}'
+            - uuid: 7b478405db8f4e598fe65e70c7c945f3
+              name: 'Free capacity - {#STORAGE}'
+              type: DEPENDENT
+              key: 'free.[{#STORAGE}]'
+              delay: '0'
+              units: B
+              valuemap:
+                name: 'Error Codes Backup Netbackup'
+              preprocessing:
+                - type: JSONPATH
+                  parameters:
+                    - '$.data[?(@.id == ''{#STORAGE}'')].attributes.freeCapacityBytes'
+                - type: TRIM
+                  parameters:
+                    - '[]'
+              master_item:
+                key: netbackup.storage.raw
+              tags:
+                - tag: application
+                  value: netbackup-storage
+                - tag: storage
+                  value: '{#STORAGE}'
+            - uuid: eec3331e57db40b383bc2a8d20a21719
+              name: 'Total capacity - {#STORAGE}'
+              type: DEPENDENT
+              key: 'total.[{#STORAGE}]'
+              delay: '0'
+              units: B
+              valuemap:
+                name: 'Error Codes Backup Netbackup'
+              preprocessing:
+                - type: JSONPATH
+                  parameters:
+                    - '$.data[?(@.id == ''{#STORAGE}'')].attributes.totalCapacityBytes'
+                - type: TRIM
+                  parameters:
+                    - '[]'
+              master_item:
+                key: netbackup.storage.raw
+              tags:
+                - tag: application
+                  value: netbackup-storage
+                - tag: storage
+                  value: '{#STORAGE}'
+            - uuid: 2db20338869746718f05d356571cf9d1
+              name: 'Used capacity - {#STORAGE}'
+              type: DEPENDENT
+              key: 'used.[{#STORAGE}]'
+              delay: '0'
+              units: B
+              valuemap:
+                name: 'Error Codes Backup Netbackup'
+              preprocessing:
+                - type: JSONPATH
+                  parameters:
+                    - '$.data[?(@.id == ''{#STORAGE}'')].attributes.usedCapacityBytes'
+                - type: TRIM
+                  parameters:
+                    - '[]'
+              master_item:
+                key: netbackup.storage.raw
+              tags:
+                - tag: application
+                  value: netbackup-storage
+                - tag: storage
+                  value: '{#STORAGE}'
+          master_item:
+            key: netbackup.storage.raw
+          lld_macro_paths:
+            - lld_macro: '{#STORAGE}'
+              path: $..id.first()
+        - uuid: 812bb3fa9c0947c6a94871c7e3db025f
+          name: 'Discovery Volume Pool Names'
+          type: DEPENDENT
+          key: discovery.volumePoolNames
+          delay: '0'
+          item_prototypes:
+            - uuid: ecdd5ef4b54d4cdba38a15b191d3d454
+              name: 'Active tapes in {#VOLUMEPOOLNAMES}'
+              type: DEPENDENT
+              key: 'lld.[{#VOLUMEPOOLNAMES}]'
+              delay: '0'
+              trends: '0'
+              preprocessing:
+                - type: JSONPATH
+                  parameters:
+                    - '$.data[?(@.attributes.volumePool == "{#VOLUMEPOOLNAMES}" && @.attributes.mediaStatus == "ACTIVE")].attributes.volumePool.length()'
+              master_item:
+                key: netbackup.tapes.media.raw
+              tags:
+                - tag: VolumePool
+              trigger_prototypes:
+                - uuid: 33cc2e76dfb449979a6f60986e290c48
+                  expression: 'last(/Netbackup HTTP/lld.[{#VOLUMEPOOLNAMES}])<=1'
+                  name: 'Low Active tape count in {#VOLUMEPOOLNAMES}'
+                  priority: INFO
+          master_item:
+            key: netbackup.tapes.volumepools.raw
+          lld_macro_paths:
+            - lld_macro: '{#VOLUMEPOOLNAMES}'
+              path: $..attributes.volumePoolName.first()
+          overrides:
+            - name: 'triggers only for'
+              step: '1'
+              filter:
+                conditions:
+                  - macro: '{#VOLUMEPOOLNAMES}'
+                    value: Scratch_Tapes
+                    operator: NOT_MATCHES_REGEX
+                    formulaid: A
+              operations:
+                - operationobject: TRIGGER_PROTOTYPE
+                  operator: NOT_EQUAL
+                  value: Scratch_Tapes
+                  discover: NO_DISCOVER
+                  status: DISABLED
+      macros:
+        - macro: '{$BEARER.TOKEN}'
+          type: SECRET_TEXT
+        - macro: '{$STORAGE.HIGH}'
+          value: '10'
+        - macro: '{$STORAGE.NOT_MATCHES}'
+          value: Tapes_LTO8
+          description: 'a regex of storages or non storages to exclude'
+        - macro: '{$STORAGE.WARNING}'
+          value: '15'
+      valuemaps:
+        - uuid: c74017862dc44cee9cdac22023d2d7e4
+          name: 'Error Codes Backup Netbackup'
+          mappings:
+            - value: '2'
+              newvalue: 'None of the requested files were backed up'
+            - value: '11'
+              newvalue: 'System call failed'
+            - value: '20'
+              newvalue: 'Invalid command parameter'
+            - value: '84'
+              newvalue: 'Media write error'
+            - value: '96'
+              newvalue: 'Unable to allocate new media for backup, storage unit has none a'
+            - value: '4287'
+              newvalue: 'A NetBackup snapshot of the virtual machine exists and the polic'
+            - value: '150'
+              newvalue: 'termination requested by administrator'
+            - value: '4234'
+              newvalue: 'VMware server login failure'
